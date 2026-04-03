@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Firstsource PMO — SEZ Address Collection</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:flex-start;min-height:100vh;}
+
+.phone-wrap{width:100%;max-width:480px;min-height:100vh;background:#fff;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,0.1);}
+
+.header{background:#1a5276;color:#fff;padding:14px;display:flex;align-items:center;gap:10px;}
+.avatar{width:40px;height:40px;border-radius:50%;background:#2980b9;display:flex;align-items:center;justify-content:center;font-weight:600;}
+.chat-bg{flex:1;overflow-y:auto;padding:10px;background:#e5ddd5;display:flex;flex-direction:column;gap:8px;}
+
+.msg-row{display:flex;flex-direction:column;}
+.msg-row.user{align-items:flex-end;}
+.msg-row.bot{align-items:flex-start;}
+
+.bubble{max-width:85%;padding:10px;border-radius:12px;font-size:14px;}
+.bot .bubble{background:#fff;}
+.user .bubble{background:#dcf8c6;}
+
+.meta{font-size:10px;color:#999;margin-top:2px;}
+
+.input-bar{display:flex;padding:10px;background:#eee;}
+.input-bar input{flex:1;padding:10px;border-radius:20px;border:none;}
+.send-btn{width:40px;height:40px;border-radius:50%;background:#1a5276;color:#fff;border:none;margin-left:5px;cursor:pointer;}
+
+.status{font-size:12px;text-align:center;padding:5px;}
+</style>
+</head>
+
+<body>
+<div class="phone-wrap">
+  <div class="header">
+    <div class="avatar">MP</div>
+    <div>Mayank's Assistant</div>
+  </div>
+
+  <div id="chat" class="chat-bg"></div>
+  <div id="status" class="status"></div>
+
+  <div class="input-bar">
+    <input id="inp" placeholder="Type..." onkeydown="if(event.key==='Enter')send()"/>
+    <button class="send-btn" onclick="send()">➤</button>
+  </div>
+</div>
+
+<script>
+const SHEET_URL = "PASTE_YOUR_SCRIPT_URL_HERE";
+
+const flow = [
+  "Hello! 👋 Please reply to begin.",
+  "Enter your full name.",
+  "Enter your 10-digit phone number.",
+  "Enter your address.",
+  "Enter your city.",
+  "Enter your PIN code.",
+  "Available for pickup? (Yes/No)"
+];
+
+let step = 0;
+let data = {};
+
+function now(){
+  return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function addMsg(text,type){
+  const chat=document.getElementById("chat");
+  const row=document.createElement("div");
+  row.className="msg-row "+type;
+
+  const bubble=document.createElement("div");
+  bubble.className="bubble";
+  bubble.innerText=text;
+
+  const meta=document.createElement("div");
+  meta.className="meta";
+  meta.innerText=now();
+
+  row.appendChild(bubble);
+  row.appendChild(meta);
+  chat.appendChild(row);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function botSay(text){
+  setTimeout(()=>addMsg(text,"bot"),500);
+}
+
+function setStatus(text){
+  document.getElementById("status").innerText=text;
+}
+
+function send(){
+  const inp=document.getElementById("inp");
+  const val=inp.value.trim();
+  if(!val) return;
+
+  addMsg(val,"user");
+  inp.value="";
+
+  // VALIDATIONS
+  if(step===2 && !/^\d{10}$/.test(val)){
+    botSay("❌ Enter valid 10-digit number");
+    return;
+  }
+
+  if(step===5 && !/^\d{6}$/.test(val)){
+    botSay("❌ Enter valid 6-digit PIN");
+    return;
+  }
+
+  if(step===0){
+    step++;
+    botSay(flow[step]);
+    return;
+  }
+
+  const keys=["name","phone","street","city","pin","pickup"];
+  data[keys[step-1]]=val;
+
+  step++;
+
+  if(step===7){
+    data.pickup = val.toLowerCase().startsWith("y") ? "Yes":"No";
+
+    botSay("✅ Saving your response...");
+    saveToSheet(data);
+
+    step=0;
+    data={};
+  } else {
+    botSay(flow[step]);
+  }
+}
+
+function saveToSheet(d){
+  setStatus("Saving...");
+
+  fetch(SHEET_URL,{
+    method:"POST",
+    mode:"cors",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({...d,timestamp:new Date().toLocaleString()})
+  })
+  .then(()=>{
+    setStatus("✅ Saved successfully");
+    setTimeout(()=>setStatus(""),3000);
+  })
+  .catch(()=>{
+    setStatus("❌ Error saving");
+  });
+}
+
+// start
+setTimeout(()=>botSay(flow[0]),500);
+</script>
+
+</body>
+</html>
